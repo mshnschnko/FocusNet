@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from torch.optim import Adam
 from torch.nn import SmoothL1Loss
 from torchvision import transforms
@@ -15,12 +15,14 @@ from model import FocusNet
 from config import batch_size, epoch_num, learning_rate, dataset_path, crop_size
 
 def train(model: nn.Module, optimizer: torch.optim.Optimizer, criterion: nn.Module,
-          train_loader: DataLoader, device: torch.device, epoch_num: int):
+          train_loader: DataLoader, val_loader: DataLoader, device: torch.device, epoch_num: int):
     model.train()
-    loss_values = []
+    train_loss_values = []
+    val_loss_values = []
 
     for epoch in range(epoch_num):
-        epoch_loss = 0
+        model.train()
+        epoch_train_loss = 0
         for i, (input_tensor, target_tensor) in enumerate(tqdm(train_loader)):
             input_tensor = input_tensor.to(device)
             target_tensor = target_tensor.to(device)
@@ -36,15 +38,34 @@ def train(model: nn.Module, optimizer: torch.optim.Optimizer, criterion: nn.Modu
             loss.backward()
             optimizer.step()
         
-            epoch_loss += loss.item()
+            epoch_train_loss += loss.item()
         
-        avg_epoch_loss = epoch_loss / len(train_loader)
-        loss_values.append(avg_epoch_loss)
+        avg_epoch_train_loss = epoch_train_loss / len(train_loader)
+        train_loss_values.append(avg_epoch_train_loss)
+
+        # Оценка на валидационной выборке
+        model.eval()
+        epoch_val_loss = 0
+        with torch.no_grad():
+            for i, (input_tensor, target_tensor) in enumerate(val_loader):
+                input_tensor = input_tensor.to(device)
+                target_tensor = target_tensor.to(device)
+                
+                # Forward pass
+                outputs = model(input_tensor)
+                
+                # Вычисление функции потерь
+                loss = criterion(outputs, target_tensor)
+                
+                epoch_val_loss += loss.item()
         
+        avg_epoch_val_loss = epoch_val_loss / len(val_loader)
+        val_loss_values.append(avg_epoch_val_loss)
+
         # Вывод прогресса обучения
-        print(f'Epoch [{epoch+1}/{epoch_num}], Loss: {avg_epoch_loss}')
+        print(f'Epoch [{epoch+1}/{epoch_num}], Train Loss: {avg_epoch_train_loss}, Val Loss: {avg_epoch_val_loss}')
     
-    return loss_values
+    return train_loss_values, val_loss_values
 
 if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -57,24 +78,33 @@ if __name__ == '__main__':
 
     # Преобразования для изображений
     transform = transforms.Compose([
-        # transforms.Resize((crop_size, crop_size)),
+        transforms.Lambda(
+            lambda img: transforms.RandomCrop((crop_size, crop_size)) if img.size[0] > crop_size and img.size[1] > crop_size else img
+        ),
         transforms.ToTensor()
     ])
 
     # Создание датасета и загрузчика данных
-    train_dataset = Dataset(dataset_path, transform)
+    dataset = Dataset(dataset_path, transform)
+    train_size = int(0.8 * len(dataset))
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     # Обучение модели
-    loss_values = train(model, optimizer, criterion, train_loader, device, epoch_num)
+    train_loss_values, val_loss_values = train(model, optimizer, criterion, train_loader, val_loader, device, epoch_num)
 
     # Сохранение модели и весов
     torch.save(model.state_dict(), f'focusnet_weights_{str(datetime.now().strftime("%d-%m-%Y_%H-%M"))}.pth')
     torch.save(model, f'focusnet_model_{str(datetime.now().strftime("%d-%m-%Y_%H-%M"))}.pth')
 
     # Построение графика потерь
-    plt.plot(range(1, epoch_num + 1), loss_values)
+    plt.plot(range(1, epoch_num + 1), train_loss_values, label='Train Loss')
+    plt.plot(range(1, epoch_num + 1), val_loss_values, label='Validation Loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.title('Training Loss')
+    plt.title('Training and Validation Loss')
+    plt.legend()
     plt.show()

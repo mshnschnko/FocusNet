@@ -8,24 +8,24 @@ from torchvision import transforms
 from config import dataset_path, crop_size
 
 class Dataset(Dataset_):
-    def __init__(self, data_dir: str, transform: Callable | None = None, is_test: bool = False):
+    def __init__(self, data_dir: str, transform: Callable | None = None):
         self.data_dir = data_dir
         self.transform = transform
         self.image_names = []
 
         idx = 0
-        stop = 4000
+        stop = 10000
 
         for root, dirs, files in os.walk(data_dir):
             for file in files:
-                if is_test and idx < stop:
-                    idx += 1
-                    continue
+                # if is_test and idx < stop:
+                #     idx += 1
+                #     continue
                 self.image_names.append(os.path.join(root, file))
                 idx += 1
-                if idx == 2*stop:
+                if idx == stop:
                     break
-            if idx == 2*stop:
+            if idx == stop:
                 break
 
     def __len__(self):

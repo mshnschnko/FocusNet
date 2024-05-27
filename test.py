@@ -32,7 +32,7 @@ if __name__ == '__main__':
     ])
 
     # Создание тестового датасета и загрузчика данных
-    test_dataset = Dataset(dataset_path, transform, True)  # Замените test_dataset_path на путь к вашему тестовому датасету
+    test_dataset = Dataset(dataset_path, transform)  # Замените test_dataset_path на путь к вашему тестовому датасету
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     # Создание экземпляра модели
