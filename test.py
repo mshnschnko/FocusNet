@@ -6,8 +6,9 @@ from torchvision import transforms
 from torch.nn import SmoothL1Loss
 
 from tqdm import tqdm
+import time
 
-from config import dataset_path, batch_size
+from config import dataset_path, batch_size, crop_size, dataset_root
 
 def test(model, test_loader, criterion, device):
     model.eval()
@@ -20,19 +21,22 @@ def test(model, test_loader, criterion, device):
             loss = criterion(output, target_tensor)
             total_loss += loss.item() * input_tensor.size(0)
     avg_loss = total_loss / len(test_loader.dataset)
-    print(f'Test Loss: {avg_loss}')
+    return avg_loss
 
 if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    # device = torch.device("cpu")
     # Преобразования для изображений
     transform = transforms.Compose([
-        # transforms.Resize((crop_size, crop_size)),
+        transforms.Lambda(
+            lambda img: transforms.RandomCrop((crop_size, crop_size))(img) if img.size[0] > crop_size and img.size[1] > crop_size else img
+        ),
         transforms.ToTensor()
     ])
 
     # Создание тестового датасета и загрузчика данных
-    test_dataset = Dataset(dataset_path, transform)  # Замените test_dataset_path на путь к вашему тестовому датасету
+    test_dataset = Dataset(dataset_path, transform)
+    exit()
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     # Создание экземпляра модели
@@ -40,7 +44,7 @@ if __name__ == '__main__':
     model.to(device)
 
     # Загрузка сохраненных весов
-    model.load_state_dict(torch.load('focusnet_weights_27-05-2024_10-43.pth'))  # Замените 'focusnet_weights.pth' на путь к вашим сохраненным весам
+    model.load_state_dict(torch.load('focusnet_weights_29-05-2024_00-47.pth'))
 
     # Функция потерь
     criterion = SmoothL1Loss()

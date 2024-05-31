@@ -5,7 +5,7 @@ from PIL import Image
 from torch.utils.data import Dataset as Dataset_
 from torchvision import transforms
 
-from config import dataset_path, crop_size
+from config import dataset_path, crop_size, dataset_size
 
 class Dataset(Dataset_):
     def __init__(self, data_dir: str, transform: Callable | None = None):
@@ -14,7 +14,6 @@ class Dataset(Dataset_):
         self.image_names = []
 
         idx = 0
-        stop = 10000
 
         for root, dirs, files in os.walk(data_dir):
             for file in files:
@@ -22,11 +21,12 @@ class Dataset(Dataset_):
                 #     idx += 1
                 #     continue
                 self.image_names.append(os.path.join(root, file))
-                idx += 1
-                if idx == stop:
-                    break
-            if idx == stop:
-                break
+            #     idx += 1
+            #     if idx == dataset_size:
+            #         break
+            # if idx == dataset_size:
+            #     break
+        print(len(self.image_names))
 
     def __len__(self):
         return len(self.image_names)
