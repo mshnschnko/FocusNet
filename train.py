@@ -14,6 +14,8 @@ import time
 from load_dataset import Dataset
 from model import FocusNet
 from test import test
+from early_stopper import EarlyStopper
+from CropTransform import ConditionalRandomCrop
 
 from config import batch_size, epoch_num, learning_rate, dataset_path, crop_size
 
@@ -27,6 +29,7 @@ def train(model: nn.Module, optimizer: torch.optim.Optimizer, criterion: nn.Modu
     train_loss_values = []
     val_loss_values = []
     current_lr = learning_rate
+    early_stopper = EarlyStopper()
 
     for epoch in range(epoch_num):
         model.train()
@@ -51,7 +54,7 @@ def train(model: nn.Module, optimizer: torch.optim.Optimizer, criterion: nn.Modu
         model.eval()
         epoch_val_loss = 0
         with torch.no_grad():
-            for i, (input_tensor, target_tensor) in enumerate(val_loader):
+            for i, (input_tensor, target_tensor) in enumerate(tqdm(val_loader)):
                 input_tensor = input_tensor.to(device)
                 target_tensor = target_tensor.to(device)
                 
@@ -75,6 +78,9 @@ def train(model: nn.Module, optimizer: torch.optim.Optimizer, criterion: nn.Modu
 
         # Вывод прогресса обучения
         print(f'Epoch [{epoch+1}/{epoch_num}], Train Loss: {avg_epoch_train_loss}, Val Loss: {avg_epoch_val_loss}, Current LR: {current_lr}')
+
+        if early_stopper.early_stop(avg_epoch_val_loss):             
+            break
     
     return train_loss_values, val_loss_values
 
@@ -91,9 +97,7 @@ if __name__ == '__main__':
 
     # Преобразования для изображений
     transform = transforms.Compose([
-        transforms.Lambda(
-            lambda img: transforms.RandomCrop((crop_size, crop_size))(img) if img.size[0] > crop_size and img.size[1] > crop_size else img
-        ),
+        ConditionalRandomCrop(crop_size),
         transforms.ToTensor()
     ])
 
@@ -104,7 +108,8 @@ if __name__ == '__main__':
     test_size = len(dataset) - train_size - val_size
     train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
+                              num_workers=3, persistent_workers=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
