@@ -36,6 +36,7 @@ class Dataset(Dataset_):
         image = Image.open(image_path).convert('RGB')
 
         if self.transform:
+            # image.save("clear.jpg")
             image = self.transform(image)
 
         match = re.search(r".*defocus(-?[0-9]+)\.jp[e]?g", image_path)
@@ -43,15 +44,3 @@ class Dataset(Dataset_):
 
         return image, target
     
-if __name__ == "__main__":
-    data_dir = dataset_path
-    transform = transforms.Compose([
-        transforms.Lambda(
-            lambda img: transforms.Resize((crop_size, crop_size)) if img.size[0] > crop_size and img.size[1] > crop_size else img
-        ),
-        transforms.ToTensor()
-    ])
-    dataset = Dataset(data_dir, transform)
-    print(len(dataset))
-    im, tg, imp = dataset[1]
-    print(imp, tg)
